@@ -51,5 +51,5 @@ Suggests:
     sessioninfo,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-biocViews: SingleCell, FlowCytometry
+biocViews: SingleCell, FlowCytometry, Infrastructure
 VignetteBuilder: knitr

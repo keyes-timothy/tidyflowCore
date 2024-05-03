@@ -55,7 +55,9 @@ bib <- c(
 
 ## Installing `tidyFlowCore`
 
-`R` is an open-source statistical environment which can be easily modified to enhance its functionality via packages. `r Biocpkg("tidyFlowCore")` is an `R` package available via [Bioconductor](http://bioconductor.org), an open-source repository for R packages related to biostatistics and biocomputing. `R` can be installed on any operating system from [CRAN](https://cran.r-project.org/) after which you can install `r Biocpkg("tidyFlowCore")` by using the following commands in your `R` session:
+`R` is an open-source statistical environment which can be easily modified to enhance its functionality via packages. `r Biocpkg("tidyFlowCore")` is an `R` package available via [Bioconductor](http://bioconductor.org), an open-source repository for R packages related to biostatistics and biocomputing. 
+
+`R` can be installed on any operating system from [CRAN](https://cran.r-project.org/), after which you can install `r Biocpkg("tidyFlowCore")` by using the following commands in your `R` session:
 
 ```{r "install", eval = FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
@@ -136,7 +138,7 @@ transformation_list <-
 transformed_bcr_flowset <- flowCore::transform(bcr_flowset, transformation_list)
 ```
 
-Alternatively, we can also use the `tidyverse`'s functional programming paradigm to perform the same transformation. For this, we use the mutate-across framework via `tidyFlowCore`:
+Alternatively, we can also use the `tidyverse`'s functional programming paradigm to perform the same transformation. For this, we use the `mutate`-`across` framework via `tidyFlowCore`:
 
 ```{r}
 transformed_bcr_flowset <- 
@@ -159,14 +161,20 @@ combined_population_id <- combined_matrix[, 'population_id']
 table(combined_population_id)
 ```
 
-`tidyFlowCore` allows us to perform the same operation simply using the `dplyr` package's `count` function: 
+`tidyFlowCore` allows us to perform the same operation simply using the `dplyr` package's `count` function, with output provided in the convenient form of a `tibble`: 
 
 ```{r}
 bcr_flowset |> 
   dplyr::count(population_id)
 ```
 
-And `tidyFlowCore` also makes it easy to perform the counting broken down by other variables in our metadata: 
+`tidyFlowCore` also makes it easy to perform the counting after grouping by other variables in our metadata. For example, we can see that `bcr_flowset` contains data from multiple .FCS files, each of which is associated with a file name. 
+
+```{r}
+flowCore::pData(object = bcr_flowset)
+```
+
+`tidyFlowCore` makes it easy to perform grouped tidy operations, like counting, using information in our `flowSet`'s metadata: 
 
 ```{r}
 bcr_flowset |> 
@@ -178,9 +186,9 @@ bcr_flowset |>
 
 ## Nesting and unnesting
 
-`flowFrame` and `flowSet` data objects have a clear relationship with one another in the `flowCore` API - essentially nested `flowFrame`s. In other words, `flowSet`s are made up of multiple `flowFrame`s!
+`flowFrame` and `flowSet` data objects have a clear relationship with one another in the `flowCore` application programming interface (API). Essentially, `flowSet`s are nested `flowFrame`s - or, in other words, `flowSet`s are made up of multiple `flowFrame`s!
 
-`tidyFlowCore` provides a useful API for converting between `flowSet` and `flowFrame` data structures at various degrees of nesting using the `group`/`nest` and `ungroup`/`unnest` verbs. Note that in the dplyr and tidyr APIs, `group`/`nest` and `ungroup`/`unnest` are **not** synonyms (grouped `data.frames` are different from nested `data.frames`). However, because of how `flowFrame`s and `flowSet`s are structured, `tidyFlowCore`'s `group`/`nest` and `ungroup`/`unnest` functions have identical behavior, respectively.
+`tidyFlowCore` provides a useful API for converting between `flowSet` and `flowFrame` data structures at various degrees of nesting using the `group`/`nest` and `ungroup`/`unnest` verbs. Note that in the `dplyr` and `tidyr` APIs, `group`/`nest` and `ungroup`/`unnest` are **not** synonyms (grouped `data.frames` are different from nested `data.frames`). However, because of how `flowFrame`s and `flowSet`s are structured, `tidyFlowCore`'s `group`/`nest` and `ungroup`/`unnest` functions have identical behavior, respectively.
 
 ```{r}
 # unnesting a flowSet results in a flowFrame with an additional column, 
@@ -192,14 +200,14 @@ bcr_flowset |>
 
 
 ```{r}
-# flowSets can be unnested and renested for various analyses
+# flowSets can be unnested and re-nested for various analyses
 bcr_flowset |> 
   dplyr::ungroup() |> 
   # group_by cell type
   dplyr::group_by(population_id) |> 
   # calculate the mean HLA-DR expression of each cell population
-  dplyr::summarize(mean_expression = mean(`HLA-DR(Yb174)Dd`)) |> 
-  dplyr::select(population_id, mean_expression)
+  dplyr::summarize(mean_hladr_expression = mean(`HLA-DR(Yb174)Dd`)) |> 
+  dplyr::select(population_id, mean_hladr_expression)
 ```
 
 
@@ -209,13 +217,68 @@ bcr_flowset |>
 `tidyFlowCore` also provides a direct interface between `ggplot2` and `flowFrame` or `flowSet` data objects. For example...
 
 ```{r}
-library(ggplot2)
+# cell population names, from the HDCytoData documentation
+population_names <- 
+  c(
+    "B-cells IgM-", 
+    "B-cells IgM+", 
+    "CD4 T-cells", 
+    "CD8 T-cells", 
+    "DC", 
+    "monocytes", 			
+    "NK cells", 			
+    "surface-"
+  )
+
+# calculate mean CD20 expression across all cells
+mean_cd20_expression <- 
+  bcr_flowset |> 
+  dplyr::ungroup() |> 
+  dplyr::summarize(mean_expression = mean(asinh(`CD20(Sm147)Dd` / 5))) |> 
+  dplyr::pull(mean_expression)
+
+# calculate mean CD4 expression across all cells
+mean_cd4_expression <- 
+  bcr_flowset |> 
+  dplyr::ungroup() |> 
+  dplyr::summarize(mean_expression = mean(asinh(`CD4(Nd145)Dd` / 5))) |> 
+  dplyr::pull(mean_expression)
+
 bcr_flowset |> 
-  dplyr::mutate(across(-ends_with("_id"), \(.x) asinh(.x / 5))) |> 
-  ggplot(aes(x = `CD45(In115)Dd`, y = `CD4(Nd145)Dd`)) + 
-  geom_point(size = 0.1, alpha = 0.1) +
-  facet_wrap(facets = vars(population_id))
+  # preprocess all columns that represent protein measurements
+  dplyr::mutate(dplyr::across(-ends_with("_id"), \(.x) asinh(.x / 5))) |> 
+  # plot a CD4 vs. CD45 scatterplot
+  ggplot2::ggplot(ggplot2::aes(x = `CD20(Sm147)Dd`, y = `CD4(Nd145)Dd`)) +
+  # add some reference lines
+  ggplot2::geom_hline(
+    yintercept = mean_cd4_expression, 
+    color = "red", 
+    linetype = "dashed"
+  ) + 
+  ggplot2::geom_vline(
+    xintercept = mean_cd20_expression, 
+    color = "red", 
+    linetype = "dashed"
+  ) + 
+  ggplot2::geom_point(size = 0.1, alpha = 0.1) +
+  # facet by cell population
+  ggplot2::facet_wrap(
+    facets = ggplot2::vars(population_id), 
+    labeller = 
+      ggplot2::as_labeller(
+        \(population_id) population_names[as.numeric(population_id)]
+      )
+  ) + 
+  # axis labels
+  ggplot2::labs(
+    x = "CD20 expression (arcsinh)", 
+    y = "CD4 expression (arcsinh)"
+  )
 ```
+
+Using some standard functions from the `ggplot2` library, we can create a scatterplot of CD4 vs. CD20 expression in the different cell populations included in the `bcr_flowset` `flowSet`. We can see, unsurprisingly, that both B-cell populations are highest for CD20 expression, whereas CD4+ T-helper cells are highest for CD4 expression. 
+
+
 
 
 

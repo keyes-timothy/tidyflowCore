@@ -159,18 +159,73 @@ bcr_flowset |>
 `tidyFlowCore` also provides a direct interface between `ggplot2` and `flowFrame` or `flowSet` data objects. For example...
 
 ```{r}
-library(ggplot2)
+# cell population names, from the HDCytoData documentation
+population_names <- 
+  c(
+    "B-cells IgM-", 
+    "B-cells IgM+", 
+    "CD4 T-cells", 
+    "CD8 T-cells", 
+    "DC", 
+    "monocytes", 			
+    "NK cells", 			
+    "surface-"
+  )
+
+# calculate mean CD20 expression across all cells
+mean_cd20_expression <- 
+  bcr_flowset |> 
+  dplyr::ungroup() |> 
+  dplyr::summarize(mean_expression = mean(asinh(`CD20(Sm147)Dd` / 5))) |> 
+  dplyr::pull(mean_expression)
+
+# calculate mean CD4 expression across all cells
+mean_cd4_expression <- 
+  bcr_flowset |> 
+  dplyr::ungroup() |> 
+  dplyr::summarize(mean_expression = mean(asinh(`CD4(Nd145)Dd` / 5))) |> 
+  dplyr::pull(mean_expression)
+
 bcr_flowset |> 
-  dplyr::mutate(across(-ends_with("_id"), \(.x) asinh(.x / 5))) |> 
-  ggplot(aes(x = `CD45(In115)Dd`, y = `CD4(Nd145)Dd`)) + 
-  geom_point(size = 0.1, alpha = 0.1) +
-  facet_wrap(facets = vars(population_id))
+  # preprocess all columns that represent protein measurements
+  dplyr::mutate(dplyr::across(-ends_with("_id"), \(.x) asinh(.x / 5))) |> 
+  # plot a CD4 vs. CD45 scatterplot
+  ggplot2::ggplot(ggplot2::aes(x = `CD20(Sm147)Dd`, y = `CD4(Nd145)Dd`)) +
+  # add some reference lines
+  ggplot2::geom_hline(
+    yintercept = mean_cd4_expression, 
+    color = "red", 
+    linetype = "dashed"
+  ) + 
+  ggplot2::geom_vline(
+    xintercept = mean_cd20_expression, 
+    color = "red", 
+    linetype = "dashed"
+  ) + 
+  ggplot2::geom_point(size = 0.1, alpha = 0.1) +
+  # facet by cell population
+  ggplot2::facet_wrap(
+    facets = ggplot2::vars(population_id), 
+    labeller = 
+      ggplot2::as_labeller(
+        \(population_id) population_names[as.numeric(population_id)]
+      )
+  ) + 
+  # axis labels
+  ggplot2::labs(
+    x = "CD20 expression (arcsinh)", 
+    y = "CD4 expression (arcsinh)"
+  )
 ```
+
+Using some standard functions from the `ggplot2` library, we can create a scatterplot of CD4 vs. CD20 expression in the different cell populations included in the `bcr_flowset` `flowSet`. We can see, unsurprisingly, that both B-cell populations are highest for CD20 expression, whereas CD4+ T-helper cells are highest for CD4 expression. 
+
+
 
 
 ## Citation
 
-Below is the citation output from using `citation('tidyFlowCore')` in R. Please
+Below is the citation output from running `citation('tidyFlowCore')` in R. Please
 run this yourself to check for any updates on how to cite __tidyFlowCore__.
 
 ```{r 'citation', eval = requireNamespace('tidyFlowCore')}
