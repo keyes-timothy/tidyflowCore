@@ -1,3 +1,14 @@
+# tidyFlowCore 0.99.2
+
+NEW FEATURES
+
+* Expanded vignettes
+* Added "Infrastructure" to BiocViews
+
+SIGNIFICANT USER-VISIBLE CHANGES
+
+* None
+
 # tidyFlowCore 0.99.1
 
 NEW FEATURES
